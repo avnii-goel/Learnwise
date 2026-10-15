@@ -12,13 +12,29 @@ from app.routes.quiz import router as quiz_router
 from app.models.quiz_attempt import QuizAttempt
 from app.models.quiz_response import QuizResponse
 
+import os
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 app = FastAPI(
     title="LearnWise API",
     description="AI-Based Personalized Learning Path Recommendation and Adaptive Assessment System",
     version="1.0.0"
+)
+
+cors_origins_env = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173"
+)
+origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(auth.router)
