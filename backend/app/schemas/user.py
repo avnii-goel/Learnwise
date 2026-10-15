@@ -1,5 +1,5 @@
 from typing import Literal
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 class UserRegister(BaseModel):
     name: str = Field(min_length=2, max_length=100)
@@ -17,5 +17,4 @@ class UserResponse(BaseModel):
     email: EmailStr
     role: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
