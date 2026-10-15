@@ -7,3 +7,6 @@ pydantic==2.13.5
 argon2-cffi==25.1.0
 email_validator
 PyJWT
+alembic
+pytest
+httpx
