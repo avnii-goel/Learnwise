@@ -7,9 +7,12 @@ from fastapi import HTTPException, status
 load_dotenv()
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+if not JWT_SECRET_KEY or len(JWT_SECRET_KEY) < 32:
+    raise RuntimeError(
+        "JWT_SECRET_KEY is missing or shorter than 32 characters. Please set a secure key in backend/.env"
+    )
 
-print("JWT SECRET LOADED:", JWT_SECRET_KEY)
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 print("JWT ALGORITHM:", JWT_ALGORITHM)
 
 
