@@ -65,9 +65,42 @@ uvicorn app.main:app --reload --port 8000
 
 ---
 
+## Database & Seeding
+
+All database migrations are managed with **Alembic**, and initial course/topic/question data is seeded via idempotent scripts.
+
+### 1. Apply Migrations
+From the `backend/` directory with your virtual environment activated:
+```zsh
+alembic upgrade head
+```
+
+### 2. Seed Initial Data
+Run the idempotent seed script to populate courses, topics, and questions (safe to re-run at any time without duplicating rows):
+```zsh
+python -m app.seeds.seed_all
+```
+
+### 3. Creating a New Migration (Teammate Workflow)
+When adding or updating SQLAlchemy models in `app/models/`:
+1. Modify your SQLAlchemy models.
+2. Autogenerate a new migration script:
+   ```zsh
+   alembic revision --autogenerate -m "describe_your_changes"
+   ```
+3. Review the generated file in `alembic/versions/` to verify constraints, indexes, and column types.
+4. Apply the migration to your database:
+   ```zsh
+   alembic upgrade head
+   ```
+5. Commit the new revision file in `alembic/versions/` so teammates can apply it via `alembic upgrade head`.
+
+---
+
 ## Database Configuration & Docker
 
 - **Shared Cloud Database:** The primary database for LearnWise is a shared cloud PostgreSQL database hosted on **Supabase**. Connections should use the Supabase Session pooler connection string on port 5432 or 6543.
+- **Row Level Security (RLS):** All application tables have RLS enabled. The FastAPI backend connects as the database owner, ensuring uninterrupted operations while preventing unauthorized direct access through Supabase's auto-generated REST/GraphQL APIs.
 - **Docker Compose (Optional):** The `docker-compose.yml` file in the root directory is strictly **optional for local-only offline experiments**. If you choose to run local Postgres via `docker compose up -d`, note that it maps container port 5432 to host port **5433** (`postgresql://learnwise_user:learnwise_password@localhost:5433/learnwise`).
 
 ---

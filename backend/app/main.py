@@ -43,7 +43,6 @@ app.include_router(topic_router)
 app.include_router(learningresource_router)
 app.include_router(quiz_router)
 
-Base.metadata.create_all(bind=engine)
 
 @app.get("/")
 def root():
