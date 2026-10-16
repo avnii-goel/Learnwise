@@ -107,7 +107,27 @@ When adding or updating SQLAlchemy models in `app/models/`:
 
 ## Testing
 
-With the backend virtual environment activated:
-```zsh
-pytest
-```
+The test suite runs with **pytest** and **FastAPI TestClient**.
+
+### Test Database Safety Guarantee
+Tests **never** run against the shared Supabase database. The test harness strictly checks that `TEST_DATABASE_URL` is set, is not identical to `DATABASE_URL`, and does not point to `supabase.com`. If any safety condition fails, the test suite aborts immediately.
+
+### Running Tests Locally
+
+1. **Start the local test database via Docker:**
+   ```zsh
+   docker compose up -d
+   ```
+   *(Local Postgres runs on host port 5433).*
+
+2. **Ensure `TEST_DATABASE_URL` is set in `backend/.env`:**
+   ```env
+   TEST_DATABASE_URL=postgresql+psycopg2://learnwise_user:learnwise_password@localhost:5433/learnwise_test
+   ```
+
+3. **Run the test suite from `backend/`:**
+   ```zsh
+   cd backend
+   pytest -v
+   ```
+   *(The test suite automatically applies all Alembic migrations to the test database and seeds baseline courses, topics, and questions before running tests).*

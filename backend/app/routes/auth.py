@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -22,6 +23,14 @@ def register(
     user_data: UserRegister,
     db: Session = Depends(get_db)
 ):
+    if user_data.role == "instructor":
+        expected_invite_code = os.getenv("INSTRUCTOR_INVITE_CODE")
+        if not expected_invite_code or user_data.invite_code != expected_invite_code:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid or missing instructor invite code"
+            )
+
     try:
         return register_user(db, user_data)
 

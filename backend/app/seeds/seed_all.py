@@ -15,6 +15,7 @@ from app.models.course import Course
 from app.models.topic import Topic
 from app.models.question import Question
 from app.question_bank import QUESTIONS
+from app.seeds.seed_users import seed_demo_users
 
 COURSES_DATA = [
     {
@@ -201,11 +202,16 @@ def run_seeds():
         questions_created, questions_skipped = seed_questions(db)
         print(f"Questions : {questions_created} created, {questions_skipped} skipped")
 
+        users_created, users_skipped = seed_demo_users(db)
+        if users_created or users_skipped:
+            print(f"Users     : {users_created} created, {users_skipped} skipped")
+
         print("--- Seeding completed successfully ---")
         return {
             "courses": (courses_created, courses_skipped),
             "topics": (topics_created, topics_skipped),
             "questions": (questions_created, questions_skipped),
+            "users": (users_created, users_skipped),
         }
     except Exception as e:
         db.rollback()

@@ -17,6 +17,12 @@ class Course(Base):
         cascade = "all, delete-orphan"
     )
 
+    quiz_attempts = relationship(
+        "QuizAttempt",
+        back_populates = "course",
+        cascade = "all, delete-orphan"
+    )
+
     __table_args__ = (
         UniqueConstraint("title", name="uq_courses_title"),
     )

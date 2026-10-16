@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.course import Course
 from app.models.topic import Topic 
+from app.models.user import User
 from app.schemas.topic import TopicCreate, TopicResponse
+from app.utils.dependencies import get_current_user, require_role
 
 router = APIRouter(
     prefix="/api/courses/{course_id}/topics",
@@ -15,7 +17,8 @@ router = APIRouter(
 def create_topic(
     course_id: int,
     topic: TopicCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("instructor"))
 ):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
@@ -38,7 +41,8 @@ def create_topic(
 @router.get("/", response_model=list[TopicResponse])
 def get_topics(
     course_id: int, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
@@ -54,7 +58,8 @@ def get_topics(
 def get_topic(
     course_id: int, 
     topic_id: int, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:

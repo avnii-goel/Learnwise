@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -6,6 +7,7 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     role: Literal["learner", "instructor"] = "learner"
+    invite_code: str | None = None
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -16,5 +18,6 @@ class UserResponse(BaseModel):
     name: str
     email: EmailStr
     role: str
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

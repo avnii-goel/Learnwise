@@ -8,10 +8,12 @@ from app.models.topic import Topic
 from app.models.question import Question
 from app.models.quiz_attempt import QuizAttempt
 from app.models.quiz_response import QuizResponse as QuizResponseModel
+from app.models.user import User
 from app.schemas.quiz import QuizResponse, QuizQuestionResponse, QuizSubmission, QuizResult
+from app.utils.dependencies import get_current_user
 
 router = APIRouter(
-    prefix="/quiz",
+    prefix="/api/quiz",
     tags=["Quiz"]
 )
 
@@ -21,7 +23,8 @@ router = APIRouter(
 )
 def generate_course_quiz(
     course_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
 
     course = (
@@ -64,11 +67,28 @@ def generate_course_quiz(
             detail="Not enough questions available for this course"
         )
 
-    # Randomly select 20 questions
-    selected_questions = random.sample(
-        questions,
-        20
-    )
+    # Ensure every topic is represented, then fill up to 20
+    questions_by_topic: dict[int, list[Question]] = {}
+    for q in questions:
+        questions_by_topic.setdefault(q.topic_id, []).append(q)
+
+    selected_questions: list[Question] = []
+    remaining_pool: list[Question] = []
+
+    for t_id in topic_ids:
+        q_list = questions_by_topic.get(t_id, [])
+        if q_list:
+            picked = random.choice(q_list)
+            selected_questions.append(picked)
+            remaining_pool.extend([item for item in q_list if item.id != picked.id])
+
+    needed = 20 - len(selected_questions)
+    if needed > 0 and len(remaining_pool) >= needed:
+        selected_questions.extend(random.sample(remaining_pool, needed))
+    elif needed > 0:
+        selected_questions = random.sample(questions, 20)
+
+    random.shuffle(selected_questions)
 
     # Prepare response without correct answers
     quiz_questions = []
@@ -98,7 +118,8 @@ def generate_course_quiz(
 )
 def submit_quiz(
     submission: QuizSubmission,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     # Check that the course exists
     course = (
@@ -126,6 +147,13 @@ def submit_quiz(
         for answer in submission.answers
     ]
 
+    # Reject duplicate question answers in the same submission
+    if len(set(question_ids)) != len(question_ids):
+        raise HTTPException(
+            status_code=400,
+            detail="Duplicate questions submitted in quiz attempt"
+        )
+
     # Fetch questions from database
     questions = (
         db.query(Question)
@@ -140,6 +168,17 @@ def submit_quiz(
             detail="One or more questions are invalid"
         )
 
+    # Verify all submitted questions belong to topics of this course
+    course_topic_ids = {
+        t.id for t in db.query(Topic.id).filter(Topic.course_id == submission.course_id).all()
+    }
+    for question in questions:
+        if question.topic_id not in course_topic_ids:
+            raise HTTPException(
+                status_code=400,
+                detail="One or more questions do not belong to the selected course"
+            )
+
     # Map question ID -> question
     question_map = {
         question.id: question
@@ -150,7 +189,7 @@ def submit_quiz(
 
     # Create quiz attempt first
     attempt = QuizAttempt(
-        user_id=1,  # temporary until authentication is connected
+        user_id=current_user.id,
         course_id=submission.course_id,
         quiz_type="INITIAL",
         score=0,

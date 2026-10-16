@@ -15,4 +15,6 @@ class QuizAttempt(Base):
     started_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), server_default=func.now())
     responses = relationship("QuizResponse", back_populates="attempt", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="quiz_attempts")
+    course = relationship("Course", back_populates="quiz_attempts")
     
