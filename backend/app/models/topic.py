@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -32,4 +32,8 @@ class Topic(Base):
     responses = relationship(
         "QuizResponse",
         back_populates = "topic"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("course_id", "title", name="uq_topics_course_id_title"),
     )

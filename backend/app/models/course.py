@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Column, Integer, String, Text, DateTime, UniqueConstraint
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -15,5 +15,9 @@ class Course(Base):
         "Topic",
         back_populates = "course",
         cascade = "all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("title", name="uq_courses_title"),
     )
 
