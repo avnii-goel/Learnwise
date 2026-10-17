@@ -47,6 +47,8 @@ from app.models.topic import Topic
 from app.models.question import Question
 from app.models.quiz_attempt import QuizAttempt
 from app.models.quiz_response import QuizResponse
+from app.models.topic_mastery import TopicMastery
+from app.models.topic_mastery_history import TopicMasteryHistory
 from app.utils.jwt import create_access_token
 from app.utils.security import hash_password
 from app.seeds.seed_all import seed_courses, seed_topics, seed_questions
@@ -83,6 +85,8 @@ def db_session():
 
     def cleanup():
         session.rollback()
+        session.query(TopicMasteryHistory).delete()
+        session.query(TopicMastery).delete()
         session.query(QuizResponse).delete()
         session.query(QuizAttempt).delete()
         session.query(User).delete()

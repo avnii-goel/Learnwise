@@ -20,3 +20,9 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan"
     )
+
+    topic_masteries = relationship(
+        "TopicMastery",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )

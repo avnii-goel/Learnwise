@@ -34,6 +34,12 @@ class Topic(Base):
         back_populates = "topic"
     )
 
+    masteries = relationship(
+        "TopicMastery",
+        back_populates = "topic",
+        cascade = "all, delete-orphan"
+    )
+
     __table_args__ = (
         UniqueConstraint("course_id", "title", name="uq_topics_course_id_title"),
     )

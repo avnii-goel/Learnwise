@@ -5,3 +5,5 @@ from app.models.learningresource import LearningResource
 from app.models.question import Question
 from app.models.quiz_attempt import QuizAttempt
 from app.models.quiz_response import QuizResponse
+from app.models.topic_mastery import TopicMastery
+from app.models.topic_mastery_history import TopicMasteryHistory
