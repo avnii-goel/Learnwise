@@ -335,7 +335,7 @@ All mastery endpoints require authentication via `current_user: User = Depends(g
 
 ### 8.1 `GET /api/mastery/me`
 
-Returns the mastery status of every topic across all courses in the platform, including unattempted topics.
+Returns the mastery status of every topic across all courses in the platform, including unattempted topics. Uses a single joined query to eliminate N+1 latency.
 
 **Query Parameters:**
 - `course_id` (optional, integer): Filter results to a specific course.
@@ -344,10 +344,11 @@ Returns the mastery status of every topic across all courses in the platform, in
 ```json
 [
   {
-    "topic_id": 1,
-    "topic_title": "TCP/IP Protocol Suite",
     "course_id": 1,
     "course_title": "Computer Networks",
+    "topic_id": 1,
+    "topic_title": "TCP/IP Protocol Suite",
+    "order": 1,
     "mastery_probability": 0.646,
     "status": "developing",
     "total_answers": 1,
@@ -355,11 +356,12 @@ Returns the mastery status of every topic across all courses in the platform, in
     "last_answered_at": "2026-10-17T12:00:00Z"
   },
   {
-    "topic_id": 2,
-    "topic_title": "Routing Algorithms",
     "course_id": 1,
     "course_title": "Computer Networks",
-    "mastery_probability": 0.30,
+    "topic_id": 2,
+    "topic_title": "Routing Algorithms",
+    "order": 2,
+    "mastery_probability": null,
     "status": "not_attempted",
     "total_answers": 0,
     "correct_answers": 0,
@@ -370,7 +372,7 @@ Returns the mastery status of every topic across all courses in the platform, in
 
 ### 8.2 `GET /api/mastery/me/courses/{course_id}`
 
-Returns a high-level mastery summary for a specific course, including aggregated status counts, average mastery across attempted topics, and topic breakdown.
+Returns a high-level mastery summary for a specific course, including aggregated status counts, average mastery across attempted topics, and topic breakdown. Returns 404 if the course does not exist. Uses a single joined query.
 
 **Response Structure (200 OK):**
 ```json
@@ -387,8 +389,11 @@ Returns a high-level mastery summary for a specific course, including aggregated
   },
   "topics": [
     {
+      "course_id": 1,
+      "course_title": "Computer Networks",
       "topic_id": 1,
       "topic_title": "TCP/IP Protocol Suite",
+      "order": 1,
       "mastery_probability": 0.85,
       "status": "strong",
       "total_answers": 4,
@@ -399,18 +404,20 @@ Returns a high-level mastery summary for a specific course, including aggregated
 }
 ```
 
-*Note on `average_mastery_attempted`:* Calculated strictly over topics where `total_answers > 0`. If no topics in the course have been attempted, returns `0.0`.
+*Note on `average_mastery_attempted`:* Calculated strictly over topics where `total_answers > 0`. If no topics in the course have been attempted, returns `null`.
 
 ### 8.3 `GET /api/mastery/me/topics/{topic_id}`
 
-Returns the detailed mastery state and chronological progression history for a single topic.
+Returns the detailed mastery state and chronological progression history for a single topic. Returns 404 if the topic does not exist.
 
 **Response Structure (200 OK):**
 ```json
 {
+  "course_id": 1,
+  "course_title": "Computer Networks",
   "topic_id": 1,
   "topic_title": "TCP/IP Protocol Suite",
-  "course_id": 1,
+  "order": 1,
   "mastery_probability": 0.85,
   "status": "strong",
   "total_answers": 4,
@@ -436,7 +443,7 @@ Returns the detailed mastery state and chronological progression history for a s
   ]
 }
 ```
-*Note:* The `history` list is ordered strictly chronologically (`created_at ASC`, oldest first).
+*Note:* The `history` list is ordered strictly chronologically (`created_at ASC, id ASC`, oldest first). Topics with no recorded attempts return the unattempted shape with `mastery_probability: null`, `status: "not_attempted"`, `total_answers: 0`, and `history: []`.
 
 ### 8.4 Scope Boundary: Instructor Endpoints
 
@@ -448,28 +455,30 @@ Instructor-facing analytics (e.g., class distribution per topic, student heatmap
 
 ### 9.1 Purpose & Execution Model
 
-A standalone administrative script (`backend/app/scripts/backfill_mastery.py` or `backend/app/seeds/backfill_mastery.py`) will be provided to process past quiz attempts that were executed prior to the activation of the BKT engine.
+A standalone administrative script (`backend/app/seeds/backfill_mastery.py`) replays historical quiz attempts executed prior to the activation of the BKT engine into `topic_mastery` and `topic_mastery_history`.
 
 ### 9.2 Deterministic Replay Ordering
 
-To produce consistent, reproducible probabilities across environments, the replay must execute in strict chronological sequence:
-1. `QuizAttempt` records are fetched ordered by `QuizAttempt.id ASC` (or `created_at ASC`).
-2. Associated `QuizResponse` records for each attempt are processed ordered by `QuizResponse.id ASC`.
-3. Sequential updates per topic are calculated and applied identical to the live submission path.
+Because BKT probability updates are strictly order-dependent, replaying attempts out of order would corrupt mastery states. The replay processes:
+1. `QuizAttempt` records ordered by `QuizAttempt.id ASC` (chronological submission order).
+2. Associated `QuizResponse` records for each attempt ordered by `QuizResponse.id ASC`.
+3. Calls the canonical `apply_attempt(db, user_id, attempt, responses)` function used by live submissions to ensure zero mathematical drift.
 
-### 9.3 Idempotency Guarantees
+### 9.3 Per-User Idempotency Rules
 
-Idempotency is enforced at the database level by the unique constraint on `topic_mastery_history (attempt_id, topic_id)`:
-- If a history record already exists for an attempt and topic, the backfill worker skips updating that record.
-- The script can be run repeatedly without duplicating history rows or inflating answer counts.
+To prevent historical attempts from being interleaved after newer live attempts:
+1. **Unrecorded Users (Clean Backfill):** For users with quiz attempts and NO existing `topic_mastery` or `topic_mastery_history` rows, all attempts are replayed chronologically.
+2. **Existing Mastery Guard (Skipping):** If a user already possesses any `topic_mastery` or `topic_mastery_history` rows, the script skips that user entirely, printing a warning with the user ID and unprocessed attempt count. No partial writes are executed.
+3. **Explicit User Rebuild (`--rebuild-user <user_id>`):** To fix a user with mixed historical/live attempts, an explicit user ID must be provided. Inside a single database transaction, the script removes that user's existing `topic_mastery` and `topic_mastery_history` rows and replays all attempts in original chronological sequence. Global `--rebuild-all` is prohibited to prevent accidental bulk loss of learner states.
 
 ### 9.4 Dry-Run Capability
 
-The script must provide a `--dry-run` flag:
+The script supports a `--dry-run` flag:
 ```zsh
-python -m app.scripts.backfill_mastery --dry-run
+python -m app.seeds.backfill_mastery --dry-run
+python -m app.seeds.backfill_mastery --rebuild-user <user_id> --dry-run
 ```
-When invoked with `--dry-run`, the script performs all calculations, displays aggregated logs and expected record creations, and triggers a full transaction rollback at completion.
+When invoked with `--dry-run`, all computations and candidate deletions/replays are executed inside an active database transaction that triggers `db.rollback()` at completion, guaranteeing zero database mutations.
 
 ---
 
@@ -477,12 +486,13 @@ When invoked with `--dry-run`, the script performs all calculations, displays ag
 
 To ensure high reliability and zero regressions, Phase 5 is partitioned into modular chunks:
 
-- **Chunk 5.0 (Current):** System Design Specification (`docs/KNOWLEDGE_MODEL.md`).
-- **Chunk 5.1:** BKT Configuration & Core Algorithm Module (`backend/app/services/bkt.py` or `bkt/`) with unit test suite verifying worked examples and clamping behavior.
-- **Chunk 5.2:** Database Models (`TopicMastery`, `TopicMasteryHistory`), Alembic Migration, and RLS enablement.
-- **Chunk 5.3:** Integration into `submit_quiz` transactional pipeline with row locking (`SELECT FOR UPDATE`).
-- **Chunk 5.4:** Learner-facing Mastery API Endpoints (`/api/mastery/...`) and Pydantic response schemas.
-- **Chunk 5.5:** Idempotent Historical Replay/Backfill Script with `--dry-run` verification.
+- **Chunk 5.0 (Completed):** System Design Specification (`docs/KNOWLEDGE_MODEL.md`).
+- **Chunk 5.1 (Completed):** Database Models (`TopicMastery`, `TopicMasteryHistory`), Alembic Migration `a7a34be56dbb`, and RLS enablement.
+- **Chunk 5.2 (Completed):** BKT Configuration & Core Algorithm Module (`backend/app/services/bkt.py`) with unit test suite verifying worked examples and clamping behavior.
+- **Chunk 5.3 & 5.3b (Completed):** Transactional Integration into `submit_quiz` (`apply_attempt`) with row locking (`SELECT FOR UPDATE`), savepoint race handling, and atomicity verification.
+- **Chunk 5.4 (Completed):** Learner-facing Mastery API Endpoints (`/api/mastery/...`) and Pydantic response schemas with single-query N+1 avoidance.
+- **Chunk 5.5 (Completed):** Per-User Historical Replay/Backfill Script with `--dry-run`, `--rebuild-user`, and test suite.
+- **Chunk 5.6 (Completed):** Synthetic Learner Population Seeding (`backend/app/seeds/seed_synthetic_learners.py`) with 5 archetype profiles, IRT response modeling, and validation suite.
 
 ---
 
@@ -494,3 +504,42 @@ The following capabilities are deliberately excluded from Phase 5:
 2. **Empirical Parameter Estimation:** Per-topic parameter optimization via Expectation-Maximization (EM) or Baum-Welch training is out of scope.
 3. **Adaptive Recommendations:** The recommender logic that consumes topic mastery to suggest personalized resources or diagnostic quizzes will be implemented in a subsequent phase.
 4. **Frontend UI Components:** No React or Vite changes are included in Phase 5 backend chunks.
+
+---
+
+## 12. Synthetic Learner Population & Simulation Engine
+
+### 12.1 Purpose & Role in Testing
+To support platform demonstration, collaborative filtering development, and A/B evaluation before live learners populate the platform, a deterministic synthetic population generator is provided in `backend/app/seeds/seed_synthetic_learners.py`.
+
+### 12.2 Architectural Decoupling: Skill-Based IRT vs. BKT
+Synthetic learner responses are generated using a 3-parameter-style Item Response Theory (IRT) logistic model, deliberately **decoupled** from BKT's inner parameters:
+
+$$P(\text{correct}) = 0.25 + 0.75 \cdot \sigma\left(4 \cdot (\theta_{\text{topic}} - b_{\text{difficulty}})\right)$$
+
+where:
+- $0.25$ represents the baseline guess rate on 4-option multiple-choice questions.
+- $\sigma(z) = \frac{1}{1 + e^{-z}}$ is the standard sigmoid logistic function.
+- $\theta_{\text{topic}} \in [0.05, 0.95]$ represents the learner's continuous latent skill on that topic.
+- $b_{\text{difficulty}}$ represents item difficulty: $-0.25$ for easy, $0.0$ for medium, and $+0.25$ for hard.
+- Between consecutive quiz attempts, a learner's topic skill experiences a small deterministic gain ($+0.03$, clamped at $0.95$) to simulate learning.
+
+**Why Decouple from BKT?**
+If synthetic answers were generated using BKT parameters ($p, P_T, s, g$), the evaluation would suffer from circular validation (the model evaluating its own generative distribution). Simulating answers via an independent continuous skill model provides an objective stress-test of BKT's Bayesian estimation under realistic, non-idealized response conditions.
+
+### 12.3 Structured Archetypes
+The synthetic population is structured deterministically into 5 archetypes:
+1. **Group A (01–10):** High mastery across all domains ($\mu \approx 0.80$).
+2. **Group B (11–20):** Low mastery across all domains ($\mu \approx 0.30$).
+3. **Group C (21–30):** Domain specialization in Systems ("Computer Networks" and "Operating Systems" $\mu \approx 0.80$; "OOPS" and "SQL/DBMS" $\mu \approx 0.35$).
+4. **Group D (31–40):** Domain specialization in Software/Data ("OOPS" and "SQL/DBMS" $\mu \approx 0.80$; "Computer Networks" and "Operating Systems" $\mu \approx 0.35$).
+5. **Group E (41–50):** Average overall ability ($\mu \approx 0.55$) with high topic variance ($\sigma \approx 0.18$).
+
+### 12.4 Valid Inferences & Limitations
+- **What it supports:**
+  - Proves the end-to-end ingestion, attempt storage, transaction integrity, and BKT update pipeline work reliably at scale.
+  - Generates clear clustering and latent correlation structure for collaborative filtering and recommender system evaluation.
+  - Enables performance benchmarks and UI smoke-testing on populated dashboards.
+- **What it does NOT support:**
+  - **Does NOT demonstrate real empirical learning gains:** Simulated skill progression is synthetic and does not represent verified pedagogical efficacy.
+  - **Does NOT calibrate BKT parameters:** Synthetic accuracy rates reflect the logistic response curve rather than empirical student answer distributions.

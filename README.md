@@ -97,6 +97,55 @@ When adding or updating SQLAlchemy models in `app/models/`:
 
 ---
 
+## Knowledge Model & Competency Tracking (Phase 5)
+
+LearnWise incorporates a Bayesian Knowledge Tracing (BKT) engine that models learner mastery per topic dynamically as quizzes are completed:
+
+- **BKT Parameter Matrix:** Prior $P(\text{Init}) = 0.30$, Transition $P(\text{Transit}) = 0.10$, bounded by $[\text{MIN\_P}=0.01, \text{MAX\_P}=0.99]$. Slip and guess rates are calibrated per question difficulty:
+  - **Easy:** Slip $s = 0.05$, Guess $g = 0.30$
+  - **Medium:** Slip $s = 0.10$, Guess $g = 0.25$
+  - **Hard:** Slip $s = 0.15$, Guess $g = 0.20$
+- **Dynamic Competency Classification:** Topics are dynamically classified on read (never stored) into four mutually exclusive statuses:
+  - `not_attempted`: $\text{total\_answers} == 0$ (including unrecorded topics)
+  - `weak`: $\text{total\_answers} > 0$ and $p < 0.40$
+  - `developing`: $0.40 \le p < 0.80$, or ($p \ge 0.80$ with $\text{total\_answers} < 3$)
+  - `strong`: $p \ge 0.80$ and $\text{total\_answers} \ge 3$
+- **Transactional Persistence:** Live quiz submissions (`POST /api/quiz/submit`) atomically calculate BKT progression and persist updates to `topic_mastery` and audit ledgers in `topic_mastery_history` using pessimistic row locking (`SELECT FOR UPDATE`).
+- **Learner Mastery Endpoints (`/api/mastery`):**
+  - `GET /api/mastery/me`: Global mastery status of all topics across all courses (single joined query).
+  - `GET /api/mastery/me/courses/{course_id}`: Course summary with status counts, average mastery over attempted topics, and topic breakdown (single joined query).
+  - `GET /api/mastery/me/topics/{topic_id}`: Single topic status with chronological progression history (`created_at ASC`, oldest first).
+- **Historical Backfill Script:**
+  To replay pre-existing quiz attempts into the mastery tables:
+  ```zsh
+  # Dry-run simulation (rolls back transaction, zero writes)
+  python -m app.seeds.backfill_mastery --dry-run
+
+  # Execute backfill for users without existing mastery records
+  python -m app.seeds.backfill_mastery
+
+  # Atomic wipe & rebuild for a specific user ID
+  python -m app.seeds.backfill_mastery --rebuild-user <user_id>
+  ```
+- **Synthetic Learner Population Generator:**
+  Generates deterministic synthetic learners across 5 structured archetypes (Groups A–E) using an independent 3PL IRT logistic response model ($P(\text{correct}) = 0.25 + 0.75 \cdot \sigma(4(\theta - b))$) for demonstration, collaborative filtering, and A/B evaluation:
+  ```zsh
+  # Dry run (rolls back transaction, zero writes)
+  SYNTHETIC_PASSWORD="YourPasswordHere" python -m app.seeds.seed_synthetic_learners --dry-run
+
+  # Seed 50 synthetic learners (default)
+  SYNTHETIC_PASSWORD="YourPasswordHere" python -m app.seeds.seed_synthetic_learners
+
+  # Seed a custom number of learners (e.g., 20)
+  SYNTHETIC_PASSWORD="YourPasswordHere" python -m app.seeds.seed_synthetic_learners --learners 20
+
+  # Reset/delete all synthetic learners (@synthetic.learnwise.test) safely
+  python -m app.seeds.seed_synthetic_learners --reset-synthetic --yes
+  ```
+  *(Note: This synthetic data demonstrates pipeline integrity and provides latent structure for collaborative filtering; it does not represent real pedagogical learning gains).*
+
+---
+
 ## Database Configuration & Docker
 
 - **Shared Cloud Database:** The primary database for LearnWise is a shared cloud PostgreSQL database hosted on **Supabase**. Connections should use the Supabase Session pooler connection string on port 5432 or 6543.

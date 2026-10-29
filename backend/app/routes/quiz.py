@@ -10,6 +10,8 @@ from app.models.quiz_attempt import QuizAttempt
 from app.models.quiz_response import QuizResponse as QuizResponseModel
 from app.models.user import User
 from app.schemas.quiz import QuizResponse, QuizQuestionResponse, QuizSubmission, QuizResult
+from app.services.mastery import apply_attempt
+from app.services.quiz import select_quiz_questions
 from app.utils.dependencies import get_current_user
 
 router = APIRouter(
@@ -67,28 +69,7 @@ def generate_course_quiz(
             detail="Not enough questions available for this course"
         )
 
-    # Ensure every topic is represented, then fill up to 20
-    questions_by_topic: dict[int, list[Question]] = {}
-    for q in questions:
-        questions_by_topic.setdefault(q.topic_id, []).append(q)
-
-    selected_questions: list[Question] = []
-    remaining_pool: list[Question] = []
-
-    for t_id in topic_ids:
-        q_list = questions_by_topic.get(t_id, [])
-        if q_list:
-            picked = random.choice(q_list)
-            selected_questions.append(picked)
-            remaining_pool.extend([item for item in q_list if item.id != picked.id])
-
-    needed = 20 - len(selected_questions)
-    if needed > 0 and len(remaining_pool) >= needed:
-        selected_questions.extend(random.sample(remaining_pool, needed))
-    elif needed > 0:
-        selected_questions = random.sample(questions, 20)
-
-    random.shuffle(selected_questions)
+    selected_questions = select_quiz_questions(questions, topic_ids, target_count=20)
 
     # Prepare response without correct answers
     quiz_questions = []
@@ -186,54 +167,64 @@ def submit_quiz(
     }
 
     correct_count = 0
+    responses_in_order = []
 
-    # Create quiz attempt first
-    attempt = QuizAttempt(
-        user_id=current_user.id,
-        course_id=submission.course_id,
-        quiz_type="INITIAL",
-        score=0,
-        total_questions=len(submission.answers)
-    )
-
-    db.add(attempt)
-    db.flush()
-
-    # Evaluate each answer
-    for answer in submission.answers:
-        question = question_map[answer.question_id]
-
-        selected_answer = answer.selected_answer.upper()
-
-        is_correct = (
-            selected_answer == question.correct_answer.upper()
+    try:
+        # Create quiz attempt first
+        attempt = QuizAttempt(
+            user_id=current_user.id,
+            course_id=submission.course_id,
+            quiz_type="INITIAL",
+            score=0,
+            total_questions=len(submission.answers)
         )
 
-        if is_correct:
-            correct_count += 1
+        db.add(attempt)
+        db.flush()
 
-        response = QuizResponseModel(
-            attempt_id=attempt.id,
-            question_id=question.id,
-            topic_id=question.topic_id,
-            selected_answer=selected_answer,
-            is_correct=is_correct
-        )
+        # Evaluate each answer
+        for answer in submission.answers:
+            question = question_map[answer.question_id]
 
-        db.add(response)
+            selected_answer = answer.selected_answer.upper()
 
-    total_questions = len(submission.answers)
-    incorrect_count = total_questions - correct_count
+            is_correct = (
+                selected_answer == question.correct_answer.upper()
+            )
 
-    percentage = (
-        correct_count / total_questions
-    ) * 100
+            if is_correct:
+                correct_count += 1
 
-    # Update final score
-    attempt.score = correct_count
+            response = QuizResponseModel(
+                attempt_id=attempt.id,
+                question_id=question.id,
+                topic_id=question.topic_id,
+                selected_answer=selected_answer,
+                is_correct=is_correct
+            )
 
-    db.commit()
-    db.refresh(attempt)
+            db.add(response)
+            responses_in_order.append(response)
+
+        total_questions = len(submission.answers)
+        incorrect_count = total_questions - correct_count
+
+        percentage = (
+            correct_count / total_questions
+        ) * 100
+
+        # Update final score
+        attempt.score = correct_count
+        db.flush()
+
+        # Apply BKT topic mastery update inside the same transaction
+        apply_attempt(db, current_user.id, attempt, responses_in_order)
+
+        db.commit()
+        db.refresh(attempt)
+    except Exception:
+        db.rollback()
+        raise
 
     return QuizResult(
         attempt_id=attempt.id,
