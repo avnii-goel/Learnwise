@@ -19,10 +19,19 @@ import random
 import secrets
 import string
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 
 # Ensure backend root is on sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
+
+@dataclass(frozen=True)
+class QuestionSnapshot:
+    id: int
+    topic_id: int
+    difficulty: str
+    correct_answer: str
 
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
@@ -245,7 +254,15 @@ def seed_synthetic_learners(
             raise RuntimeError(
                 f"Course '{title}' has only {len(questions)} questions (minimum 20 required)."
             )
-        questions_by_course_id[course.id] = questions
+        questions_by_course_id[course.id] = [
+            QuestionSnapshot(
+                id=q.id,
+                topic_id=q.topic_id,
+                difficulty=q.difficulty,
+                correct_answer=q.correct_answer,
+            )
+            for q in questions
+        ]
 
     # 2. Setup deterministic RNG and anchor time
     rng = random.Random(seed)
@@ -405,6 +422,7 @@ def seed_synthetic_learners(
                         selected_answer=selected_ans,
                         is_correct=is_correct,
                     )
+                    resp._cached_question = q
                     db.add(resp)
                     responses_in_order.append(resp)
 
@@ -472,6 +490,8 @@ def seed_synthetic_learners(
                 db.rollback()
             else:
                 db.commit()
+
+            print(f"[{idx:02d}/{num_learners}] Seeded learner {email} ({group_key}) - {total_attempts} attempts", flush=True)
 
         except Exception as e:
             db.rollback()

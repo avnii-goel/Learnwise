@@ -60,7 +60,7 @@ def apply_attempt(
     already_processed_topics = {h[0] for h in existing_histories}
 
     # 3. Ensure question metadata (difficulty) is accessible
-    question_ids = [r.question_id for r in responses_in_order]
+    question_ids = [r.question_id for r in responses_in_order if not hasattr(r, "_cached_question")]
     questions_cache: dict[int, Question] = {}
     if question_ids:
         loaded_questions = (
@@ -90,7 +90,7 @@ def apply_attempt(
             if resp.is_correct:
                 correct_in_attempt += 1
 
-            q = getattr(resp, "question", None) or questions_cache.get(resp.question_id)
+            q = getattr(resp, "_cached_question", None) or questions_cache.get(resp.question_id) or getattr(resp, "question", None)
             difficulty = q.difficulty if q else None
 
             current_p = update_mastery(current_p, resp.is_correct, difficulty)

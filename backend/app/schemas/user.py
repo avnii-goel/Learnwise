@@ -1,6 +1,9 @@
 from datetime import datetime
 from typing import Literal
+import email_validator
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+email_validator.TEST_ENVIRONMENT = True
 
 class UserRegister(BaseModel):
     name: str = Field(min_length=2, max_length=100)
