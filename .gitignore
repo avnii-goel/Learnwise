@@ -1,8 +1,9 @@
 # Python
+__pycache__/
+*.pyc
+**/*.pyc
+**/__pycache__/
 backend/venv/
-backend/__pycache__/
-backend/**/*.pyc
-backend/**/__pycache__/
 
 # Environment variables
 .env
@@ -14,6 +15,10 @@ frontend/dist/
 
 # IDE
 .vscode/
+
+# Caches
+.cache/
+.pytest_cache/
 
 # OS
 .DS_Store

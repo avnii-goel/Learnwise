@@ -39,6 +39,10 @@ from app.services.mastery import apply_attempt
 from app.services.quiz import select_quiz_questions
 from app.utils.security import hash_password
 
+DEFAULT_NUM_LEARNERS = 50
+SYNTHETIC_EMAIL_DOMAIN = "@synthetic.learnwise.test"
+SYNTHETIC_EMAIL_PATTERN = "%@synthetic.learnwise.test"
+
 REQUIRED_COURSE_TITLES = [
     "Computer Networks",
     "OOPS",

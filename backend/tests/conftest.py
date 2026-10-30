@@ -1,5 +1,9 @@
 import os
 import sys
+
+# Guarantee test isolation: prevent any model downloads during pytest
+os.environ["EMBEDDER_BACKEND"] = "fake"
+
 import pytest
 from dotenv import load_dotenv
 
@@ -49,6 +53,9 @@ from app.models.quiz_attempt import QuizAttempt
 from app.models.quiz_response import QuizResponse
 from app.models.topic_mastery import TopicMastery
 from app.models.topic_mastery_history import TopicMasteryHistory
+from app.models.topic_prerequisite import TopicPrerequisite
+from app.models.recommendation_impression import RecommendationImpression
+from app.models.learningresource import LearningResource
 from app.utils.jwt import create_access_token
 from app.utils.security import hash_password
 from app.seeds.seed_all import seed_courses, seed_topics, seed_questions
@@ -60,6 +67,11 @@ TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_eng
 @pytest.fixture(scope="session", autouse=True)
 def apply_migrations_and_seed_data():
     """Applies all Alembic migrations and seeds courses/topics/questions into the test database."""
+    # Ensure vector extension is enabled
+    with test_engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        conn.commit()
+
     alembic_ini_path = os.path.join(backend_root, "alembic.ini")
     alembic_cfg = Config(alembic_ini_path)
     alembic_cfg.set_main_option("sqlalchemy.url", TEST_DATABASE_URL)
@@ -85,11 +97,14 @@ def db_session():
 
     def cleanup():
         session.rollback()
+        session.query(RecommendationImpression).delete()
+        session.query(TopicPrerequisite).delete()
         session.query(TopicMasteryHistory).delete()
         session.query(TopicMastery).delete()
         session.query(QuizResponse).delete()
         session.query(QuizAttempt).delete()
         session.query(User).delete()
+        session.query(LearningResource).delete()
         non_baseline = session.query(Course).filter(~Course.title.in_(baseline_courses)).all()
         for c in non_baseline:
             session.delete(c)

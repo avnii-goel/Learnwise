@@ -10,3 +10,5 @@ PyJWT
 alembic
 pytest
 httpx
+pgvector==0.5.1
+fastembed==0.9.1

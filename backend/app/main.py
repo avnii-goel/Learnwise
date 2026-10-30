@@ -10,6 +10,7 @@ from app.routes.learningresource import router as learningresource_router
 from app.models.question import Question
 from app.routes.quiz import router as quiz_router
 from app.routes.mastery import router as mastery_router
+from app.routes.recommendations import router as recommendations_router
 from app.models.quiz_attempt import QuizAttempt
 from app.models.quiz_response import QuizResponse
 
@@ -44,6 +45,7 @@ app.include_router(topic_router)
 app.include_router(learningresource_router)
 app.include_router(quiz_router)
 app.include_router(mastery_router)
+app.include_router(recommendations_router)
 
 
 @app.get("/")

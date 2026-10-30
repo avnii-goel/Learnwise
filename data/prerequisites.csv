@@ -1,0 +1,17 @@
+course_title,topic_title,prerequisite_topic_title
+Computer Networks,OSI & TCP/IP Models,Network Fundamentals
+Computer Networks,Network Layer,OSI & TCP/IP Models
+Computer Networks,Transport Layer,Network Layer
+Computer Networks,Application Layer,Transport Layer
+OOPS,Classes & Objects,OOP Fundamentals
+OOPS,Inheritance,Classes & Objects
+OOPS,Polymorphism,Inheritance
+SQL/DBMS,ER Model,DBMS Fundamentals
+SQL/DBMS,Relational Model & SQL,DBMS Fundamentals
+SQL/DBMS,Normalization,Relational Model & SQL
+SQL/DBMS,Transactions & Concurrency,Relational Model & SQL
+Operating Systems,Processes & Threads,OS Fundamentals
+Operating Systems,CPU Scheduling,Processes & Threads
+Operating Systems,Synchronization & Deadlocks,Processes & Threads
+Operating Systems,Memory Management,OS Fundamentals
+Operating Systems,File Systems,OS Fundamentals

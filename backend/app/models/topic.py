@@ -40,6 +40,26 @@ class Topic(Base):
         cascade = "all, delete-orphan"
     )
 
+    prerequisites = relationship(
+        "TopicPrerequisite",
+        foreign_keys="TopicPrerequisite.topic_id",
+        back_populates="topic",
+        cascade="all, delete-orphan"
+    )
+
+    prerequisite_for = relationship(
+        "TopicPrerequisite",
+        foreign_keys="TopicPrerequisite.prerequisite_topic_id",
+        back_populates="prerequisite_topic",
+        cascade="all, delete-orphan"
+    )
+
+    recommendation_impressions = relationship(
+        "RecommendationImpression",
+        back_populates="topic",
+        cascade="all, delete-orphan"
+    )
+
     __table_args__ = (
         UniqueConstraint("course_id", "title", name="uq_topics_course_id_title"),
     )

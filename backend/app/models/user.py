@@ -26,3 +26,9 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan"
     )
+
+    recommendation_impressions = relationship(
+        "RecommendationImpression",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )

@@ -115,6 +115,9 @@ LearnWise incorporates a Bayesian Knowledge Tracing (BKT) engine that models lea
   - `GET /api/mastery/me`: Global mastery status of all topics across all courses (single joined query).
   - `GET /api/mastery/me/courses/{course_id}`: Course summary with status counts, average mastery over attempted topics, and topic breakdown (single joined query).
   - `GET /api/mastery/me/topics/{topic_id}`: Single topic status with chronological progression history (`created_at ASC`, oldest first).
+- **Personalized Recommendations Endpoints (`/api/recommendations`):**
+  - `POST /api/recommendations/me`: Generates personalized learning resource recommendations for the authenticated learner using hybrid or content-only strategy, audit logging impressions to `recommendation_impressions`.
+  - `POST /api/recommendations/impressions/{impression_id}/click`: Records learner engagement click idempotently against an impression.
 - **Historical Backfill Script:**
   To replay pre-existing quiz attempts into the mastery tables:
   ```zsh
