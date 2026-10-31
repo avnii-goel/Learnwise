@@ -72,11 +72,12 @@ def run_backfill(
                 return stats
             target_user_ids = [rebuild_user_id]
         else:
-            # All users with at least one quiz attempt
+            # All users with at least one completed quiz attempt
             target_user_ids = [
                 row[0]
                 for row in (
                     db.query(QuizAttempt.user_id)
+                    .filter(QuizAttempt.status == "completed")
                     .distinct()
                     .order_by(QuizAttempt.user_id.asc())
                     .all()
@@ -114,7 +115,9 @@ def run_backfill(
             # Normal backfill mode: skip if already has history/mastery
             elif has_existing:
                 user_attempts_count = (
-                    db.query(QuizAttempt).filter(QuizAttempt.user_id == user_id).count()
+                    db.query(QuizAttempt)
+                    .filter(QuizAttempt.user_id == user_id, QuizAttempt.status == "completed")
+                    .count()
                 )
                 print(
                     f"WARNING: Skipping user {user_id}: user already has mastery/history records "
@@ -123,10 +126,10 @@ def run_backfill(
                 stats["users_skipped"] += 1
                 continue
 
-            # Load all attempts for this user in chronological order
+            # Load all completed attempts for this user in chronological order
             user_attempts = (
                 db.query(QuizAttempt)
-                .filter(QuizAttempt.user_id == user_id)
+                .filter(QuizAttempt.user_id == user_id, QuizAttempt.status == "completed")
                 .order_by(QuizAttempt.id.asc())
                 .all()
             )

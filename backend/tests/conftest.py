@@ -56,6 +56,7 @@ from app.models.topic_mastery_history import TopicMasteryHistory
 from app.models.topic_prerequisite import TopicPrerequisite
 from app.models.recommendation_impression import RecommendationImpression
 from app.models.learningresource import LearningResource
+from app.models.adaptive_quiz_step import AdaptiveQuizStep
 from app.utils.jwt import create_access_token
 from app.utils.security import hash_password
 from app.seeds.seed_all import seed_courses, seed_topics, seed_questions
@@ -97,6 +98,7 @@ def db_session():
 
     def cleanup():
         session.rollback()
+        session.query(AdaptiveQuizStep).delete()
         session.query(RecommendationImpression).delete()
         session.query(TopicPrerequisite).delete()
         session.query(TopicMasteryHistory).delete()

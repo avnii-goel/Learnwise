@@ -23,6 +23,7 @@ class Question(Base):
 
     topic = relationship("Topic", back_populates="questions")
     responses = relationship("QuizResponse", back_populates = "question")
+    adaptive_steps = relationship("AdaptiveQuizStep", back_populates="question")
 
     __table_args__ = (
         UniqueConstraint("topic_id", "question_text", name="uq_questions_topic_id_question_text"),

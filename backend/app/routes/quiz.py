@@ -1,5 +1,6 @@
+from datetime import datetime, timezone
 import random
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -9,9 +10,22 @@ from app.models.question import Question
 from app.models.quiz_attempt import QuizAttempt
 from app.models.quiz_response import QuizResponse as QuizResponseModel
 from app.models.user import User
-from app.schemas.quiz import QuizResponse, QuizQuestionResponse, QuizSubmission, QuizResult
+from app.schemas.quiz import (
+    QuizResponse,
+    QuizQuestionResponse,
+    QuizSubmission,
+    QuizResult,
+    AdaptiveStartRequest,
+    AdaptiveStartResponse,
+    AdaptiveAnswerRequest,
+    AdaptiveAnswerResponse,
+)
 from app.services.mastery import apply_attempt
-from app.services.quiz import select_quiz_questions
+from app.services.quiz import select_quiz_questions, check_answer_correctness
+from app.services.adaptive_service import (
+    start_or_resume_adaptive_quiz,
+    submit_adaptive_answer,
+)
 from app.utils.dependencies import get_current_user
 
 router = APIRouter(
@@ -170,13 +184,18 @@ def submit_quiz(
     responses_in_order = []
 
     try:
+        now = datetime.now(timezone.utc)
         # Create quiz attempt first
         attempt = QuizAttempt(
             user_id=current_user.id,
             course_id=submission.course_id,
             quiz_type="INITIAL",
+            mode="fixed",
+            status="completed",
             score=0,
-            total_questions=len(submission.answers)
+            total_questions=len(submission.answers),
+            started_at=now,
+            completed_at=now,
         )
 
         db.add(attempt)
@@ -186,11 +205,8 @@ def submit_quiz(
         for answer in submission.answers:
             question = question_map[answer.question_id]
 
-            selected_answer = answer.selected_answer.upper()
-
-            is_correct = (
-                selected_answer == question.correct_answer.upper()
-            )
+            selected_answer = answer.selected_answer.strip().upper()
+            is_correct = check_answer_correctness(selected_answer, question.correct_answer)
 
             if is_correct:
                 correct_count += 1
@@ -215,10 +231,11 @@ def submit_quiz(
 
         # Update final score
         attempt.score = correct_count
+        attempt.completed_at = now
         db.flush()
 
         # Apply BKT topic mastery update inside the same transaction
-        apply_attempt(db, current_user.id, attempt, responses_in_order)
+        apply_attempt(db, current_user.id, attempt, responses_in_order, as_of=now)
 
         db.commit()
         db.refresh(attempt)
@@ -234,4 +251,47 @@ def submit_quiz(
         percentage=round(percentage, 2),
         correct_answers=correct_count,
         incorrect_answers=incorrect_count
+    )
+
+
+# --- Adaptive Quizzing Endpoints (Phase 7) ---
+
+@router.post(
+    "/adaptive/start",
+    response_model=AdaptiveStartResponse,
+)
+def start_adaptive_quiz(
+    payload: AdaptiveStartRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Starts a new 8-question single-topic adaptive quiz or resumes an in-progress attempt."""
+    resp_data, status_code = start_or_resume_adaptive_quiz(
+        db=db,
+        user_id=current_user.id,
+        topic_id=payload.topic_id,
+    )
+    response.status_code = status_code
+    return resp_data
+
+
+@router.post(
+    "/adaptive/{attempt_id}/answer",
+    response_model=AdaptiveAnswerResponse,
+    status_code=status.HTTP_200_OK,
+)
+def answer_adaptive_quiz_step(
+    attempt_id: int,
+    payload: AdaptiveAnswerRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Submits an answer for the active pending step of an adaptive quiz session."""
+    return submit_adaptive_answer(
+        db=db,
+        user_id=current_user.id,
+        attempt_id=attempt_id,
+        question_id=payload.question_id,
+        selected_answer=payload.selected_answer,
     )

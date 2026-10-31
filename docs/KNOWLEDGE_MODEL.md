@@ -44,6 +44,11 @@
   - [9.4 Dry-Run Capability](#94-dry-run-capability)
 - [10. Implementation Roadmap (Chunks 5.1–5.5)](#10-implementation-roadmap-chunks-5155)
 - [11. Explicit Non-Goals & Out of Scope](#11-explicit-non-goals--out-of-scope)
+- [12. Synthetic Learner Population & Simulation Engine](#12-synthetic-learner-population--simulation-engine)
+  - [12.1 Purpose & Role in Testing](#121-purpose--role-in-testing)
+  - [12.2 Architectural Decoupling: Skill-Based IRT vs. BKT](#122-architectural-decoupling-skill-based-irt-vs-bkt)
+  - [12.3 Structured Archetypes](#123-structured-archetypes)
+  - [12.4 Valid Inferences & Limitations](#124-valid-inferences--limitations)
 
 ---
 

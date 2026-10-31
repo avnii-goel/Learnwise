@@ -52,3 +52,10 @@ def select_quiz_questions(
 
     rand.shuffle(selected_questions)
     return selected_questions
+
+
+def check_answer_correctness(selected_answer: str, correct_answer: str) -> bool:
+    """Evaluates multiple-choice answer correctness case-insensitively."""
+    if not selected_answer or not correct_answer:
+        return False
+    return selected_answer.strip().upper() == correct_answer.strip().upper()

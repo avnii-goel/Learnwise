@@ -235,6 +235,7 @@ def recommend_for_user(
             .join(QuizAttempt, QuizResponse.attempt_id == QuizAttempt.id)
             .filter(
                 QuizAttempt.user_id == user_id,
+                QuizAttempt.status == "completed",
                 QuizResponse.topic_id == target.topic_id,
                 QuizResponse.is_correct == False,
             )

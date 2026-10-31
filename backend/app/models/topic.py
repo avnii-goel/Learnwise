@@ -60,6 +60,11 @@ class Topic(Base):
         cascade="all, delete-orphan"
     )
 
+    quiz_attempts = relationship(
+        "QuizAttempt",
+        back_populates="topic"
+    )
+
     __table_args__ = (
         UniqueConstraint("course_id", "title", name="uq_topics_course_id_title"),
     )

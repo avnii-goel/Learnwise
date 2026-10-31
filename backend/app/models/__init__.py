@@ -9,3 +9,4 @@ from app.models.topic_mastery import TopicMastery
 from app.models.topic_mastery_history import TopicMasteryHistory
 from app.models.topic_prerequisite import TopicPrerequisite
 from app.models.recommendation_impression import RecommendationImpression
+from app.models.adaptive_quiz_step import AdaptiveQuizStep

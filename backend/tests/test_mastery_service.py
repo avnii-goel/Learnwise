@@ -5,6 +5,7 @@ Tests row locking, persistence, independent BKT recomputations, history chains,
 idempotency, and isolation across learners.
 """
 
+from datetime import datetime, timezone
 import pytest
 from fastapi import status
 
@@ -373,12 +374,17 @@ def test_apply_attempt_idempotency_does_not_double_apply(test_learner, db_sessio
     question = db_session.query(Question).filter(Question.topic_id == topic.id).first()
 
     # Create an attempt manually
+    now = datetime.now(timezone.utc)
     attempt = QuizAttempt(
         user_id=test_learner.id,
         course_id=course.id,
         quiz_type="INITIAL",
+        mode="fixed",
+        status="completed",
         score=1,
         total_questions=1,
+        started_at=now,
+        completed_at=now,
     )
     db_session.add(attempt)
     db_session.flush()
