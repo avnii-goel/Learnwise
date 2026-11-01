@@ -434,7 +434,7 @@ DEMO_PASS="<DEMO_PASSWORD>"
 # Register a new isolated test account
 TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/register \
   -H "Content-Type: application/json" \
-  -d "{\"email\": \"${DEMO_EMAIL}\", \"password\": \"${DEMO_PASS}\", \"full_name\": \"Adaptive Demo Learner\"}" \
+  -d "{\"email\": \"${DEMO_EMAIL}\", \"password\": \"${DEMO_PASS}\", \"name\": \"Adaptive Demo Learner\"}" \
   | python3 -c "import sys, json; print(json.load(sys.stdin).get('access_token', ''))")
 
 # If already registered, login instead:

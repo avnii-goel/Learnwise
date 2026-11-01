@@ -206,7 +206,7 @@ Each topic is classified into one of four mutually exclusive competency categori
 
 > [!NOTE]
 > **Reaching Strong Status Within One Quiz:**  
-> With typical quiz configurations distributing 3 to 4 questions per topic across a 20-question course quiz, a topic can only reach `"strong"` ($p \ge 0.80$ and $\text{total\_answers} \ge 3$) within a single quiz if **all** answers for that topic are correct (e.g., starting from $P_{\text{INIT}} = 0.30$, three consecutive correct medium answers progress: $0.30 \rightarrow 0.6460 \rightarrow 0.8492 \rightarrow 0.9398$). If a learner answers even one question incorrectly under that topic, the mastery drop prevents it from reaching the $0.80$ threshold within the same attempt, requiring further quiz attempts to achieve `"strong"` status.
+> With typical quiz configurations distributing 3 to 4 questions per topic across a 20-question course quiz, a topic can only reach `"strong"` ($p \ge 0.80$ and $\text{total\_answers} \ge 3$) within a single quiz if **all** answers for that topic are correct (e.g., starting from $P_{\text{INIT}} = 0.30$, three consecutive correct medium answers progress: $0.30 \rightarrow 0.6461 \rightarrow 0.8811 \rightarrow 0.9675$). If a learner answers even one question incorrectly under that topic, the mastery drop prevents it from reaching the $0.80$ threshold within the same attempt, requiring further quiz attempts to achieve `"strong"` status.
 
 ---
 

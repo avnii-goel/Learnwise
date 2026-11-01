@@ -2,184 +2,241 @@
 
 **AI-Based Personalized Learning Path Recommendation & Adaptive Assessment System**
 
-LearnWise is a full-stack learning platform designed to assess learner competencies and deliver personalized learning pathways. It features JWT-based role authentication, hierarchical course/topic structures, curated learning resources, dynamic quiz generation, and server-side assessment.
+LearnWise is an AI-powered personalized learning and adaptive assessment platform that models student knowledge in real time. It pairs Bayesian Knowledge Tracing (BKT) and hybrid resource recommendations with single-topic adaptive quizzing and cohort-wide analytics dashboards. The system delivers personalized learning pathways for students while providing instructors with actionable cohort competency insights.
 
 ---
 
 ## Tech Stack
 
-- **Backend:** [FastAPI](https://fastapi.tiangolo.com/), [SQLAlchemy 2.0](https://www.sqlalchemy.org/), [Pydantic v2](https://docs.pydantic.dev/), [Argon2-cffi](https://argon2-cffi.readthedocs.io/), [PyJWT](https://pyjwt.readthedocs.io/)
-- **Frontend:** [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite](https://vite.dev/)
-- **Database & Infrastructure:** [PostgreSQL](https://www.postgresql.org/) (hosted on Supabase Cloud), [Docker Compose](https://docs.docker.com/compose/) (optional for local development)
+- **Backend:** [FastAPI](https://fastapi.tiangolo.com/), [SQLAlchemy 2.0](https://www.sqlalchemy.org/), [Pydantic v2](https://docs.pydantic.dev/), [Argon2-cffi](https://argon2-cffi.readthedocs.io/), [PyJWT](https://pyjwt.readthedocs.io/), [pgvector](https://github.com/pgvector/pgvector-python)
+- **Frontend:** [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/) (strict mode), [Vite](https://vite.dev/), [React Router v7](https://reactrouter.com/), [Recharts](https://recharts.org/)
+- **Database & Infrastructure:** [PostgreSQL 16](https://www.postgresql.org/) (hosted on Supabase Cloud with Row Level Security; local test DB on port 5433 via Docker Compose)
 
 ---
 
-## macOS Setup & Running Locally
+## Repository Layout
+
+```
+Learnwise/
+├── backend/
+│   ├── alembic/              # Database migration versions and env configuration
+│   ├── app/
+│   │   ├── models/           # SQLAlchemy declarative ORM models
+│   │   ├── routes/           # FastAPI REST API route endpoints
+│   │   ├── schemas/          # Pydantic v2 request and response schemas
+│   │   ├── seeds/            # Idempotent data seeding & synthetic learner generator
+│   │   ├── services/         # Business logic: BKT, adaptive quiz, recommender, dashboards
+│   │   └── utils/            # JWT auth, dependencies, password hashing
+│   ├── tests/                # Pytest test suite (179 tests, runs on local test DB)
+│   └── requirements.txt      # Python backend dependencies
+├── frontend/
+│   ├── src/
+│   │   ├── api/              # API fetch client and strict TypeScript types
+│   │   ├── auth/             # React AuthContext, token management, session state
+│   │   ├── components/       # Layout, header, navigation, and role route guards
+│   │   ├── lib/              # Pure formatting and data mapping helpers
+│   │   ├── pages/            # LearnerDashboard, InstructorDashboard, quiz runners, Login
+│   │   └── test/             # Vitest + React Testing Library test suite (23 tests)
+│   └── package.json          # Node dependencies and build scripts
+├── docs/                     # Technical specifications and architectural references
+│   ├── KNOWLEDGE_MODEL.md    # BKT mathematical specification and data architecture
+│   ├── ADAPTIVE_QUIZ.md      # Adaptive assessment engine specification
+│   ├── RECOMMENDER.md        # Hybrid recommendation system specification
+│   └── DASHBOARDS.md         # Dashboards, metrics, worked examples, and demo guide
+├── scripts/                  # Data ingestion, embedding, simulation, and verification scripts
+│   └── verify_phase8.py      # Read-only Supabase database verification script
+└── docker-compose.yml        # Local isolated test PostgreSQL container configuration
+```
+
+---
+
+## Getting Started & Local Setup
 
 ### Prerequisites
-- macOS with **Python 3.10+** (verify with `python3 --version`)
-- Node.js 18+ (for frontend)
-- Git
+- macOS or Linux with **Python 3.10+**
+- **Node.js 18+** & **npm**
+- **Docker** (for local test database)
+
+---
 
 ### 1. Backend Setup
 
-All backend commands should be run from the `backend/` directory:
+All backend commands run from the `backend/` directory:
 
-```zsh
+```bash
 cd backend
-```
-
-#### Step 1: Create and Activate Virtual Environment
-Make sure you use Python 3.10 or higher:
-```zsh
 python3 -m venv venv
 source venv/bin/activate
-```
-
-#### Step 2: Install Dependencies
-```zsh
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-#### Step 3: Configure Environment Variables
-Copy the template `.env.example` to `.env`:
-```zsh
+#### Environment Configuration
+Copy the template `.env.example` to `backend/.env`:
+
+```bash
 cp .env.example .env
 ```
-Edit `backend/.env` with your actual credentials:
-- **`DATABASE_URL`**: Your Supabase Session pooler connection string. Ensure special characters in passwords are URL-encoded.
-- **`JWT_SECRET_KEY`**: A secure 32+ character key (generate with `openssl rand -hex 32`).
-- **`JWT_ALGORITHM`**: Defaults to `HS256`.
-- **`JWT_ACCESS_TOKEN_EXPIRE_MINUTES`**: Token expiration in minutes (e.g. `60`).
-- **`CORS_ORIGINS`**: Frontend URLs, e.g. `http://localhost:5173,http://127.0.0.1:5173`.
-- **`INSTRUCTOR_INVITE_CODE`**: Required code to register instructor accounts.
 
-#### Step 4: Run the Backend Server
-From within the `backend/` directory with the virtual environment activated:
-```zsh
-uvicorn app.main:app --reload --port 8000
+Configure `backend/.env` with your environment variables (see `.env.example` for details; **use placeholders only; never commit real credentials**):
+
+```env
+DATABASE_URL=<DATABASE_URL>
+TEST_DATABASE_URL=<TEST_DATABASE_URL>
+JWT_KEY=<JWT_SIGNING_KEY>
+JWT_ALGORITHM=HS256
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=60
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+INSTRUCTOR_INVITE_CODE=<INSTRUCTOR_INVITE_CODE>
+SYNTHETIC_PASSWORD=<SYNTHETIC_PASSWORD>
 ```
-- Interactive API Docs (Swagger): [http://localhost:8000/docs](http://localhost:8000/docs)
+
+#### Apply Database Migrations & Seed Baseline Data
+```bash
+alembic upgrade head
+python -m app.seeds.seed_all
+```
+
+#### Run Backend Server
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+- Interactive Swagger API Docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 - Health Check: [http://localhost:8000/health](http://localhost:8000/health)
 
 ---
 
-## Database & Seeding
+### 2. Frontend Setup
 
-All database migrations are managed with **Alembic**, and initial course/topic/question data is seeded via idempotent scripts.
+All frontend commands run from the `frontend/` directory:
 
-### 1. Apply Migrations
-From the `backend/` directory with your virtual environment activated:
-```zsh
-alembic upgrade head
+```bash
+cd frontend
+npm install
 ```
 
-### 2. Seed Initial Data
-Run the idempotent seed script to populate courses, topics, and questions (safe to re-run at any time without duplicating rows):
-```zsh
-python -m app.seeds.seed_all
+#### Environment Configuration
+Copy `frontend/.env.example` to `frontend/.env`:
+
+```bash
+cp .env.example .env
 ```
 
-### 3. Creating a New Migration (Teammate Workflow)
-When adding or updating SQLAlchemy models in `app/models/`:
-1. Modify your SQLAlchemy models.
-2. Autogenerate a new migration script:
-   ```zsh
-   alembic revision --autogenerate -m "describe_your_changes"
-   ```
-3. Review the generated file in `alembic/versions/` to verify constraints, indexes, and column types.
-4. Apply the migration to your database:
-   ```zsh
-   alembic upgrade head
-   ```
-5. Commit the new revision file in `alembic/versions/` so teammates can apply it via `alembic upgrade head`.
+Ensure the API base URL points to the backend:
+```env
+VITE_API_BASE_URL=http://localhost:8000
+```
 
----
-
-## Knowledge Model & Competency Tracking (Phase 5)
-
-LearnWise incorporates a Bayesian Knowledge Tracing (BKT) engine that models learner mastery per topic dynamically as quizzes are completed:
-
-- **BKT Parameter Matrix:** Prior $P(\text{Init}) = 0.30$, Transition $P(\text{Transit}) = 0.10$, bounded by $[\text{MIN\_P}=0.01, \text{MAX\_P}=0.99]$. Slip and guess rates are calibrated per question difficulty:
-  - **Easy:** Slip $s = 0.05$, Guess $g = 0.30$
-  - **Medium:** Slip $s = 0.10$, Guess $g = 0.25$
-  - **Hard:** Slip $s = 0.15$, Guess $g = 0.20$
-- **Dynamic Competency Classification:** Topics are dynamically classified on read (never stored) into four mutually exclusive statuses:
-  - `not_attempted`: $\text{total\_answers} == 0$ (including unrecorded topics)
-  - `weak`: $\text{total\_answers} > 0$ and $p < 0.40$
-  - `developing`: $0.40 \le p < 0.80$, or ($p \ge 0.80$ with $\text{total\_answers} < 3$)
-  - `strong`: $p \ge 0.80$ and $\text{total\_answers} \ge 3$
-- **Transactional Persistence:** Live quiz submissions (`POST /api/quiz/submit`) atomically calculate BKT progression and persist updates to `topic_mastery` and audit ledgers in `topic_mastery_history` using pessimistic row locking (`SELECT FOR UPDATE`).
-- **Learner Mastery Endpoints (`/api/mastery`):**
-  - `GET /api/mastery/me`: Global mastery status of all topics across all courses (single joined query).
-  - `GET /api/mastery/me/courses/{course_id}`: Course summary with status counts, average mastery over attempted topics, and topic breakdown (single joined query).
-  - `GET /api/mastery/me/topics/{topic_id}`: Single topic status with chronological progression history (`created_at ASC`, oldest first).
-- **Personalized Recommendations Endpoints (`/api/recommendations`):**
-  - `POST /api/recommendations/me`: Generates personalized learning resource recommendations for the authenticated learner using hybrid or content-only strategy, audit logging impressions to `recommendation_impressions`.
-  - `POST /api/recommendations/impressions/{impression_id}/click`: Records learner engagement click idempotently against an impression.
-- **Historical Backfill Script:**
-  To replay pre-existing quiz attempts into the mastery tables:
-  ```zsh
-  # Dry-run simulation (rolls back transaction, zero writes)
-  python -m app.seeds.backfill_mastery --dry-run
-
-  # Execute backfill for users without existing mastery records
-  python -m app.seeds.backfill_mastery
-
-  # Atomic wipe & rebuild for a specific user ID
-  python -m app.seeds.backfill_mastery --rebuild-user <user_id>
-  ```
-- **Synthetic Learner Population Generator:**
-  Generates deterministic synthetic learners across 5 structured archetypes (Groups A–E) using an independent 3PL IRT logistic response model ($P(\text{correct}) = 0.25 + 0.75 \cdot \sigma(4(\theta - b))$) for demonstration, collaborative filtering, and A/B evaluation:
-  ```zsh
-  # Dry run (rolls back transaction, zero writes)
-  SYNTHETIC_PASSWORD="YourPasswordHere" python -m app.seeds.seed_synthetic_learners --dry-run
-
-  # Seed 50 synthetic learners (default)
-  SYNTHETIC_PASSWORD="YourPasswordHere" python -m app.seeds.seed_synthetic_learners
-
-  # Seed a custom number of learners (e.g., 20)
-  SYNTHETIC_PASSWORD="YourPasswordHere" python -m app.seeds.seed_synthetic_learners --learners 20
-
-  # Reset/delete all synthetic learners (@synthetic.learnwise.test) safely
-  python -m app.seeds.seed_synthetic_learners --reset-synthetic --yes
-  ```
-  *(Note: This synthetic data demonstrates pipeline integrity and provides latent structure for collaborative filtering; it does not represent real pedagogical learning gains).*
-
----
-
-## Database Configuration & Docker
-
-- **Shared Cloud Database:** The primary database for LearnWise is a shared cloud PostgreSQL database hosted on **Supabase**. Connections should use the Supabase Session pooler connection string on port 5432 or 6543.
-- **Row Level Security (RLS):** All application tables have RLS enabled. The FastAPI backend connects as the database owner, ensuring uninterrupted operations while preventing unauthorized direct access through Supabase's auto-generated REST/GraphQL APIs.
-- **Docker Compose (Optional):** The `docker-compose.yml` file in the root directory is strictly **optional for local-only offline experiments**. If you choose to run local Postgres via `docker compose up -d`, note that it maps container port 5432 to host port **5433** (`postgresql://learnwise_user:learnwise_password@localhost:5433/learnwise`).
+#### Run Frontend Dev Server
+```bash
+npm run dev
+```
+Open your browser at [http://localhost:5173](http://localhost:5173).
 
 ---
 
 ## Testing
 
-The test suite runs with **pytest** and **FastAPI TestClient**.
+### Local Test Database Safety Guarantee
+Tests **never** run against the shared Supabase cloud database. The pytest test harness enforces that `TEST_DATABASE_URL` is configured, does not match `DATABASE_URL`, and never points to a remote `supabase` domain.
 
-### Test Database Safety Guarantee
-Tests **never** run against the shared Supabase database. The test harness strictly checks that `TEST_DATABASE_URL` is set, is not identical to `DATABASE_URL`, and does not point to `supabase.com`. If any safety condition fails, the test suite aborts immediately.
+### 1. Run Backend Test Suite (179 tests)
+Start the local isolated PostgreSQL test container on port 5433:
 
-### Running Tests Locally
+```bash
+docker compose up -d
+cd backend
+source venv/bin/activate
+pytest -v
+```
 
-1. **Start the local test database via Docker:**
-   ```zsh
-   docker compose up -d
-   ```
-   *(Local Postgres runs on host port 5433).*
+### 2. Run Frontend Test Suite (23 tests)
+```bash
+cd frontend
+npm run test
+npm run typecheck
+npm run build
+```
 
-2. **Ensure `TEST_DATABASE_URL` is set in `backend/.env`:**
-   ```env
-   TEST_DATABASE_URL=postgresql+psycopg2://learnwise_user:learnwise_password@localhost:5433/learnwise_test
-   ```
+---
 
-3. **Run the test suite from `backend/`:**
-   ```zsh
-   cd backend
-   pytest -v
-   ```
-   *(The test suite automatically applies all Alembic migrations to the test database and seeds baseline courses, topics, and questions before running tests).*
+## Automated Supabase Audit Script (`scripts/verify_phase8.py`)
+
+A standalone, strictly **read-only** verification script is provided to audit live database metrics against independent raw SQL calculations without persisting any changes.
+
+### Running the Audit Script
+Run from the repository root:
+
+```bash
+source backend/venv/bin/activate
+export DATABASE_URL="<SUPABASE_SESSION_POOLER_URL>"
+PYTHONPATH=backend python scripts/verify_phase8.py
+```
+
+### Safety Guarantee
+- Operates under `SET TRANSACTION READ ONLY`.
+- Contains zero `INSERT`, `UPDATE`, or `DELETE` statements.
+- Never invokes `commit()`, and always issues an explicit `rollback()`.
+- Does not automatically read `.env` configuration; requires explicit `DATABASE_URL` in the environment.
+
+### Checks Performed
+1. **V1: Total Learners Count:** Validates `GET /api/dashboard/instructor/overview.total_learners` against `SELECT count(*) FROM users WHERE role = 'learner'`.
+2. **V2: Cohort Completed Attempts & Quiz Average:** Validates `completed_attempts`, `active_learners`, and `avg_quiz_percentage` against independent SQL aggregates over completed attempts (`qa.status = 'completed'`).
+3. **V3: Per-Topic Cohort Metrics:** Checks `learners_attempted`, `avg_mastery`, and question `accuracy_percent` across every topic against `topic_mastery`.
+4. **V4: Per-Course Quiz Averages & Attempts:** Checks course-level `avg_quiz_percentage` and `completed_attempts` against SQL grouped by `course_id`.
+5. **V5: Instructor Learners Directory:** Checks each learner's `attempted_topics`, `avg_mastery`, `completed_attempts`, and `avg_quiz_percentage` without row fan-out.
+6. **V6: Learner Dashboard Consistency:** Asserts that each active learner's `status_counts` (`strong` + `developing` + `weak` + `not_attempted`) sums to total topics dynamically counted from the database, and validates individual progress and mastery against SQL.
+7. **V7: Trend vs Overview Alignment (WARN level):** Checks whether the latest cumulative mastery point in `get_learner_trends` aligns with `avg_mastery_attempted` in `get_learner_dashboard_overview`.
+8. **V8: Synthetic Learner Archetypes:** Validates archetype separation across synthetic cohorts:
+   - Group 01–10 mean mastery exceeds Group 11–20 by $\ge 0.15$.
+   - Group 21–30 Systems ("Computer Networks", "Operating Systems") mastery exceeds Apps ("OOPS", "SQL/DBMS") by $\ge 0.15$.
+   - Group 31–40 Apps mastery exceeds Systems by $\ge 0.15$.
+   *(Skips cleanly with PASS if fewer than 40 synthetic accounts exist in the database).*
+9. **V9: Completed Attempts completed_at Integrity (WARN level):** Checks for NULL `completed_at` timestamps on completed quiz attempts to confirm `COALESCE(completed_at, started_at)` query safety.
+
+---
+
+## Project Phases Summary (Phases 1–8)
+
+| Phase | Title | Scope & Highlights |
+| :--- | :--- | :--- |
+| **Phase 1** | Database & Auth Foundation | User authentication with Argon2 password hashing, JWT bearer tokens, role-based authorization (`learner`, `instructor`), SQLAlchemy declarative models, Alembic migrations. |
+| **Phase 2** | Course & Topic Hierarchy | Core CS curriculum structure: 4 courses (Computer Networks, Operating Systems, OOPS, SQL/DBMS), 24 topics, idempotent seeding. |
+| **Phase 3** | Resource Repository & Search | 72 curated multi-format, multi-difficulty learning resources, PostgreSQL full-text search, Row Level Security (RLS) enforcement. |
+| **Phase 4** | Assessment Engine | Dynamic 20-question course quiz generator, deterministic scoring, answer verification, response ledger persistence. |
+| **Phase 5** | Knowledge Model (BKT) | Bayesian Knowledge Tracing engine, calibrated difficulty parameters (easy/medium/hard slip & guess rates), dynamic competency classification (`weak`, `developing`, `strong`), mastery REST APIs, atomic attempt application with row locks, 50 structured synthetic learners across 5 archetypes. |
+| **Phase 6** | Adaptive Testing Engine | 8-question single-topic adaptive quizzes, calibrated Dirichlet item selection with target difficulty cutoff, item-level BKT updates, resume idempotency. |
+| **Phase 7** | Recommendation Pipeline | Hybrid recommendation system combining collaborative filtering, semantic embeddings (pgvector), and BKT need scoring; impression audit logging and click tracking. |
+| **Phase 8** | Dashboards & Frontend | End-to-end React single-page application with role routing, interactive adaptive and fixed quiz runners, learner dashboard (overview, Recharts radar/trends, recommendations panel, history table), instructor dashboard (cohort stats, course comparison, topic mastery, difficult topics, sortable learners directory), and automated verification suite. |
+
+---
+
+## Documentation Pointers
+
+Detailed architectural specifications and mathematical models are maintained in `docs/`:
+- [`docs/KNOWLEDGE_MODEL.md`](docs/KNOWLEDGE_MODEL.md): BKT mathematical formulation, parameter matrix, update dynamics, transactional execution, and dynamic status derivation.
+- [`docs/ADAPTIVE_QUIZ.md`](docs/ADAPTIVE_QUIZ.md): Single-topic adaptive testing engine, Dirichlet difficulty sampling, and runtime attempt state machine.
+- [`docs/RECOMMENDER.md`](docs/RECOMMENDER.md): Multi-strategy recommendation engine, hybrid ranking formula, impression audit logging, and click telemetry.
+- [`docs/DASHBOARDS.md`](docs/DASHBOARDS.md): Full Phase 8 specification, metric definitions, worked examples, API schemas, frontend architecture, and live demo guide.
+
+---
+
+## Known Limitations
+
+1. **Recommendation Impression Logging:** Every visit to the learner dashboard dispatches `POST /api/recommendations/me` (guarded to once per mount), generating fresh impression audit rows in `recommendation_impressions`.
+2. **Client-Side Token Persistence:** JWT access tokens are stored in browser `localStorage`. This is appropriate for single-page application demonstrations; production environments should transition to `HttpOnly` secure cookies.
+3. **Unpaginated Instructor Directory:** The instructor learners table renders all cohort students with client-side sorting, designed for standard cohort sizes (up to ~100 learners). Very large cohorts will require server-side pagination.
+4. **Bundle Size:** The production frontend bundle size is approximately 707 kB (~205 kB gzipped) due to the bundled Recharts visualization library. Future iterations can introduce dynamic route code-splitting (`React.lazy`).
+5. **Synthetic Learner Data Scope:** Synthetic learner response patterns prove pipeline integrity, mathematical aggregation accuracy, and archetype clustering; they do not assert real human learning gains.
+6. **Heuristic Difficult Topic Cutoff:** The threshold of 5 learners (`MIN_LEARNERS_FOR_DIFFICULT = 5`) for difficult topic inclusion is a heuristic cutoff.
+
+---
+
+## Future Scope
+
+The following capabilities are reserved for post-Phase 8 project iterations:
+1. **A/B Testing Framework:** Controlled evaluation of single-topic adaptive quizzes versus fixed course quizzes, and hybrid recommendation versus content-only recommendation strategies. (Data hooks are preserved in `quiz_attempts.mode` and `recommendation_impressions.strategy`).
+2. **LMS Interoperability:** LTI 1.3 integration with learning management platforms (Canvas, Blackboard, Moodle) for single sign-on and gradebook passback.
+3. **Instructor Learner Drill-Down:** Dedicated per-learner deep-dive modal or sub-route allowing instructors to inspect an individual learner's question-by-question timeline and mastery history.
+4. **Temporal Mastery Decay:** Integrating Ebbinghaus forgetting curves into BKT to model knowledge decay over prolonged inactivity.
+5. **Empirical Parameter Calibration:** Baum-Welch or Expectation-Maximization parameter fitting from live student response telemetry.
